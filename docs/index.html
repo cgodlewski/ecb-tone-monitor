@@ -261,6 +261,22 @@
   .chart-card,
   .table-card { padding: 18px; }
 
+  .chart-frame {
+    position: relative;
+    width: 100%;
+    height: 320px;
+  }
+
+  .chart-frame.compact {
+    height: 260px;
+  }
+
+  .chart-frame canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
   .section-head {
     display: flex;
     justify-content: space-between;
@@ -486,13 +502,17 @@
           <div class="section-title"><strong>Tone timeline</strong> monthly average score</div>
           <div class="legend"><span class="hawk">hawkish</span><span class="dove">dovish</span></div>
         </div>
-        <canvas id="timeline-chart" height="150"></canvas>
+        <div class="chart-frame">
+          <canvas id="timeline-chart"></canvas>
+        </div>
       </div>
       <div class="panel chart-card">
         <div class="section-head">
           <div class="section-title"><strong>Distribution</strong> score counts</div>
         </div>
-        <canvas id="distribution-chart" height="150"></canvas>
+        <div class="chart-frame compact">
+          <canvas id="distribution-chart"></canvas>
+        </div>
       </div>
     </div>
 
