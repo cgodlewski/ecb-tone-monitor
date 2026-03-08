@@ -1,12 +1,5 @@
-﻿__pycache__/
+﻿local/
+__pycache__/
 *.pyc
 .env
 .venv/
-logs/
-data/api_cache.json
-data/ecb_subset_scored_hybrid_test.csv
-CBS_dataset_v1.0.csv
-ecb_speeches_lite.csv
-ecb_speeches_scored.csv
-ecb_speeches_scored2.csv
-ecb_hawkdove_dashboard_4.html
