@@ -1,31 +1,11 @@
 ﻿# ECB Tone Monitor
 
-Public repository for a small static GitHub Pages dashboard.
+Small static dashboard for ECB speech tone, published with GitHub Pages.
 
-## Public repo contents
+The public repo only keeps the files needed for the site in `docs/`.
+All working code, data, and logs stay locally in `local/` and are not published.
 
-Only the files needed for the public site are tracked here:
-
-- `docs/index.html`
-- `docs/data/ecb_subset_scored.csv`
-- `README.md`
-- `.gitignore`
-
-## Local workspace
-
-All pipeline code, intermediate files, logs, and working data should stay in `local/`.
-That folder is ignored by Git and is not meant to be published.
-
-Current local layout:
-
-- `local/src/`
-- `local/data/`
-- `local/logs/`
-- `local/requirements.txt`
-
-## Update workflow
-
-From the local workspace, regenerate the dashboard dataset if needed:
+To update the dashboard locally:
 
 ```powershell
 python local/src/prepare_subset.py
@@ -33,14 +13,10 @@ python local/src/score_speeches.py --mode heuristic --output local/data/ecb_subs
 Copy-Item local\data\ecb_subset_scored.csv docs\data\ecb_subset_scored.csv -Force
 ```
 
-Then commit only the public files:
+Then publish the update:
 
 ```powershell
 git add docs README.md .gitignore
 git commit -m "Update dashboard"
 git push origin HEAD:main
 ```
-
-## GitHub Pages
-
-The site is served from `docs/` on the `main` branch.
