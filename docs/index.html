@@ -1,0 +1,867 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECB Tone Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #06111f;
+    --bg-glow: #0d1a31;
+    --surface: rgba(11, 23, 42, 0.92);
+    --surface-2: rgba(16, 33, 58, 0.88);
+    --border: rgba(90, 140, 196, 0.18);
+    --text: #dbe9ff;
+    --text-dim: #7f95b7;
+    --hawk: #ff6b6b;
+    --dove: #67b7ff;
+    --neutral: #a4b5cb;
+    --lagarde: #d7a6ff;
+    --schnabel: #ffb56b;
+    --ok: #73e0a9;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--text);
+    background:
+      radial-gradient(circle at top left, rgba(93, 155, 255, 0.12), transparent 32%),
+      radial-gradient(circle at top right, rgba(255, 107, 107, 0.09), transparent 30%),
+      linear-gradient(180deg, #030915 0%, #07121f 100%);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(103,183,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(103,183,255,0.04) 1px, transparent 1px);
+    background-size: 36px 36px;
+    pointer-events: none;
+    opacity: 0.45;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 28px 20px 48px;
+  }
+
+  .hero {
+    margin-bottom: 28px;
+    padding: 12px 0 8px;
+  }
+
+  .eyebrow {
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    margin: 0;
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(34px, 5vw, 60px);
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    max-width: 720px;
+    background: linear-gradient(135deg, #dff0ff 0%, #9ec9ff 42%, #ffc0c0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-copy {
+    max-width: 760px;
+    margin-top: 14px;
+    color: var(--text-dim);
+    line-height: 1.65;
+    font-size: 13px;
+  }
+
+  .meta-strip {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+
+  .meta-pill {
+    border: 1px solid var(--border);
+    background: rgba(11, 23, 42, 0.72);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .meta-pill strong { color: var(--text); font-weight: 500; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(10px);
+  }
+
+  .status-banner {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 18px;
+    padding: 14px 16px;
+  }
+
+  .status-note {
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .status-note strong { color: var(--text); }
+
+  .upload-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    padding: 9px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    transition: 0.16s ease;
+  }
+
+  .btn:hover { color: var(--text); border-color: rgba(103,183,255,0.4); transform: translateY(-1px); }
+  .btn.active { color: var(--text); border-color: rgba(103,183,255,0.55); background: rgba(103,183,255,0.12); }
+  .btn input { display: none; }
+
+  .dashboard { display: grid; gap: 18px; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .stat-card { padding: 16px; }
+  .stat-label {
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(28px, 4vw, 38px);
+    letter-spacing: -0.04em;
+  }
+
+  .stat-value.hawk { color: var(--hawk); }
+  .stat-value.dove { color: var(--dove); }
+
+  .filters {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 16px 18px;
+  }
+
+  .filter-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .filter-title {
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-right: 2px;
+  }
+
+  .speaker-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .speaker-card { padding: 18px; }
+  .speaker-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    margin-bottom: 6px;
+  }
+  .speaker-meta {
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-bottom: 18px;
+  }
+  .speaker-score {
+    font-family: 'DM Serif Display', serif;
+    font-size: 44px;
+    line-height: 0.9;
+  }
+  .speaker-tone {
+    margin-top: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+  }
+  .bar-track {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(127,149,183,0.12);
+    margin-top: 18px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+  }
+  .bar-center {
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    bottom: -2px;
+    width: 1px;
+    background: rgba(219,233,255,0.25);
+  }
+
+  .chart-card,
+  .table-card { padding: 18px; }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .section-title {
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .section-title strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+
+  .legend span::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .legend .hawk::before { background: var(--hawk); }
+  .legend .dove::before { background: var(--dove); }
+
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 18px;
+  }
+
+  .rank-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .ranking-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .ranking-item {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(127,149,183,0.12);
+  }
+
+  .ranking-item:last-child { border-bottom: 0; }
+  .rank-no { color: var(--text-dim); font-size: 11px; }
+  .rank-title { font-size: 12px; color: var(--text); margin-bottom: 4px; }
+  .rank-meta { font-size: 11px; color: var(--text-dim); }
+  .rank-score {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+  }
+  .rank-score.hawk { color: var(--hawk); }
+  .rank-score.dove { color: var(--dove); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  th, td {
+    padding: 12px 10px;
+    border-bottom: 1px solid rgba(127,149,183,0.12);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  tr:hover td { background: rgba(103,183,255,0.04); }
+
+  .score-pill {
+    display: inline-block;
+    min-width: 42px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    text-align: center;
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+  }
+
+  .score-pill.hawk { color: var(--hawk); background: rgba(255,107,107,0.12); }
+  .score-pill.dove { color: var(--dove); background: rgba(103,183,255,0.12); }
+  .score-pill.neutral { color: var(--neutral); background: rgba(164,181,203,0.12); }
+
+  .status-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: var(--text-dim);
+    border: 1px solid rgba(127,149,183,0.16);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .reason {
+    color: var(--text-dim);
+    max-width: 540px;
+    line-height: 1.55;
+  }
+
+  .muted {
+    color: var(--text-dim);
+  }
+
+  .empty {
+    color: var(--text-dim);
+    padding: 30px 4px;
+    text-align: center;
+  }
+
+  @media (max-width: 980px) {
+    .stats, .speaker-grid, .chart-grid, .rank-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 720px) {
+    .app { padding: 18px 14px 40px; }
+    .status-banner { flex-direction: column; align-items: flex-start; }
+    .filters { align-items: flex-start; }
+    table { min-width: 760px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="hero">
+    <div class="eyebrow">ECB communication • experimental dashboard • static GitHub Pages build</div>
+    <h1>ECB Tone Monitor</h1>
+    <div class="hero-copy">
+      A compact public demo built from the CBS speeches dataset with a quota-safe scoring workflow.
+      The current version narrows the sample to Christine Lagarde and Isabel Schnabel from late 2019 to 2023,
+      using local heuristic scoring as the default baseline.
+    </div>
+    <div class="meta-strip">
+      <div class="meta-pill"><strong>Scope</strong> 2019-2023</div>
+      <div class="meta-pill"><strong>Speakers</strong> Lagarde, Schnabel</div>
+      <div class="meta-pill"><strong>Mode</strong> Heuristic-first, API-optional</div>
+      <div class="meta-pill"><strong>Deployment</strong> Static HTML + CSV</div>
+    </div>
+  </section>
+
+  <section class="panel status-banner">
+    <div class="status-note" id="load-note">
+      <strong>Loading default dataset…</strong> If the page is served from GitHub Pages, it will fetch the bundled CSV automatically.
+      If you open the file locally and the fetch is blocked, use the upload button.
+    </div>
+    <div class="upload-row">
+      <button class="btn" id="reload-btn" type="button">Reload bundled CSV</button>
+      <label class="btn" for="file-input">Upload another CSV<input id="file-input" type="file" accept=".csv"></label>
+    </div>
+  </section>
+
+  <section class="dashboard">
+    <div class="stats">
+      <div class="panel stat-card">
+        <div class="stat-label">Scored speeches</div>
+        <div class="stat-value" id="stat-total">-</div>
+      </div>
+      <div class="panel stat-card">
+        <div class="stat-label">Average tone</div>
+        <div class="stat-value" id="stat-avg">-</div>
+      </div>
+      <div class="panel stat-card">
+        <div class="stat-label">Hawkish share</div>
+        <div class="stat-value" id="stat-hawk-share">-</div>
+      </div>
+      <div class="panel stat-card">
+        <div class="stat-label">Ambiguous cases</div>
+        <div class="stat-value" id="stat-ambiguous">-</div>
+      </div>
+    </div>
+
+    <div class="panel filters">
+      <div class="filter-group">
+        <div class="filter-title">Speaker</div>
+        <button class="btn active" data-speaker="all">All</button>
+        <button class="btn" data-speaker="Christine Lagarde">Lagarde</button>
+        <button class="btn" data-speaker="Isabel Schnabel">Schnabel</button>
+      </div>
+      <div class="filter-group">
+        <div class="filter-title">Period</div>
+        <button class="btn active" data-period="all">All</button>
+        <button class="btn" data-period="pre_hike">2019-2021</button>
+        <button class="btn" data-period="hike_cycle">2022-2023</button>
+      </div>
+    </div>
+
+    <div class="speaker-grid" id="speaker-grid"></div>
+
+    <div class="chart-grid">
+      <div class="panel chart-card">
+        <div class="section-head">
+          <div class="section-title"><strong>Tone timeline</strong> monthly average score</div>
+          <div class="legend"><span class="hawk">hawkish</span><span class="dove">dovish</span></div>
+        </div>
+        <canvas id="timeline-chart" height="150"></canvas>
+      </div>
+      <div class="panel chart-card">
+        <div class="section-head">
+          <div class="section-title"><strong>Distribution</strong> score counts</div>
+        </div>
+        <canvas id="distribution-chart" height="150"></canvas>
+      </div>
+    </div>
+
+    <div class="rank-grid">
+      <div class="panel chart-card">
+        <div class="section-head">
+          <div class="section-title"><strong>Most hawkish</strong> speeches in view</div>
+        </div>
+        <ul class="ranking-list" id="hawk-list"></ul>
+      </div>
+      <div class="panel chart-card">
+        <div class="section-head">
+          <div class="section-title"><strong>Most dovish</strong> speeches in view</div>
+        </div>
+        <ul class="ranking-list" id="dove-list"></ul>
+      </div>
+    </div>
+
+    <div class="panel table-card">
+      <div class="section-head">
+        <div class="section-title"><strong>Speech table</strong> sortable rows</div>
+        <div class="muted" id="table-count"></div>
+      </div>
+      <div style="overflow:auto">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="Date">Date</th>
+              <th data-sort="Authorname">Speaker</th>
+              <th data-sort="hawk_dove_score">Score</th>
+              <th data-sort="confidence">Confidence</th>
+              <th data-sort="scoring_status">Status</th>
+              <th>Rationale</th>
+            </tr>
+          </thead>
+          <tbody id="speech-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const DATA_URL = './data/ecb_subset_scored.csv';
+let rawRows = [];
+let visibleRows = [];
+let speakerFilter = 'all';
+let periodFilter = 'all';
+let sortColumn = 'Date';
+let sortDirection = 'desc';
+let timelineChart = null;
+let distributionChart = null;
+
+const note = document.getElementById('load-note');
+const fileInput = document.getElementById('file-input');
+const reloadBtn = document.getElementById('reload-btn');
+
+reloadBtn.addEventListener('click', () => loadBundledCsv());
+fileInput.addEventListener('change', event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  parseFile(file);
+});
+
+document.querySelectorAll('[data-speaker]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    speakerFilter = btn.dataset.speaker;
+    setActiveGroup('speaker', speakerFilter);
+    applyFilters();
+  });
+});
+
+document.querySelectorAll('[data-period]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    periodFilter = btn.dataset.period;
+    setActiveGroup('period', periodFilter);
+    applyFilters();
+  });
+});
+
+document.querySelectorAll('th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const next = th.dataset.sort;
+    if (sortColumn === next) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = next;
+      sortDirection = next === 'Date' ? 'desc' : 'asc';
+    }
+    renderTable();
+  });
+});
+
+function setActiveGroup(kind, value) {
+  document.querySelectorAll(`[data-${kind}]`).forEach(btn => {
+    btn.classList.toggle('active', btn.dataset[kind] === value);
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function scoreClass(score) {
+  if (score > 0) return 'hawk';
+  if (score < 0) return 'dove';
+  return 'neutral';
+}
+
+function scoreLabel(score) {
+  if (score > 0) return 'hawkish';
+  if (score < 0) return 'dovish';
+  return 'balanced';
+}
+
+function speakerColor(name) {
+  return name === 'Christine Lagarde' ? 'var(--lagarde)' : 'var(--schnabel)';
+}
+
+function normalizeRow(row) {
+  const score = Number.parseFloat(row.hawk_dove_score);
+  if (Number.isNaN(score)) return null;
+  const confidence = Number.parseFloat(row.confidence || '0');
+  return {
+    ...row,
+    hawk_dove_score: score,
+    confidence: Number.isNaN(confidence) ? 0 : confidence,
+    short_rationale: row.short_rationale || row.analysis_reason || '',
+    DateObj: new Date(row.Date),
+    MonthKey: row.Date?.slice(0, 7) || '',
+  };
+}
+
+function setRows(rows, sourceLabel) {
+  rawRows = rows.map(normalizeRow).filter(Boolean).sort((a, b) => a.DateObj - b.DateObj);
+  note.innerHTML = `<strong>${sourceLabel}</strong> ${rawRows.length} scored speeches loaded.`;
+  applyFilters();
+}
+
+async function loadBundledCsv() {
+  note.innerHTML = '<strong>Loading bundled CSV…</strong> Fetching <code>docs/data/ecb_subset_scored.csv</code>.';
+  try {
+    const response = await fetch(DATA_URL, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      complete: result => setRows(result.data, 'Bundled CSV loaded.'),
+      error: error => { throw error; }
+    });
+  } catch (error) {
+    note.innerHTML = '<strong>Automatic load failed.</strong> This often happens when the file is opened directly instead of served over HTTP. Use the upload button.';
+  }
+}
+
+function parseFile(file) {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: result => setRows(result.data, 'Uploaded CSV loaded.'),
+  });
+}
+
+function applyFilters() {
+  visibleRows = rawRows.filter(row => {
+    if (speakerFilter !== 'all' && row.Authorname !== speakerFilter) return false;
+    if (periodFilter === 'pre_hike' && row.DateObj >= new Date('2022-01-01')) return false;
+    if (periodFilter === 'hike_cycle' && row.DateObj < new Date('2022-01-01')) return false;
+    return true;
+  });
+  renderAll();
+}
+
+function renderAll() {
+  renderStats();
+  renderSpeakerCards();
+  renderTimeline();
+  renderDistribution();
+  renderRankings();
+  renderTable();
+}
+
+function renderStats() {
+  const total = visibleRows.length;
+  const avg = total ? visibleRows.reduce((sum, row) => sum + row.hawk_dove_score, 0) / total : 0;
+  const hawkishShare = total ? visibleRows.filter(row => row.hawk_dove_score > 0).length / total : 0;
+  const ambiguous = visibleRows.filter(row => row.scoring_status === 'ambiguous' || row.scoring_status === 'scored_fallback').length;
+
+  const avgNode = document.getElementById('stat-avg');
+  avgNode.textContent = total ? `${avg > 0 ? '+' : ''}${avg.toFixed(2)}` : '-';
+  avgNode.className = `stat-value ${scoreClass(avg)}`;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-hawk-share').textContent = total ? `${Math.round(hawkishShare * 100)}%` : '-';
+  document.getElementById('stat-ambiguous').textContent = ambiguous;
+}
+
+function renderSpeakerCards() {
+  const speakers = ['Christine Lagarde', 'Isabel Schnabel'];
+  const container = document.getElementById('speaker-grid');
+  container.innerHTML = '';
+
+  speakers.forEach(name => {
+    const rows = visibleRows.filter(row => row.Authorname === name);
+    if (!rows.length) return;
+
+    const average = rows.reduce((sum, row) => sum + row.hawk_dove_score, 0) / rows.length;
+    const minYear = rows[0].Date.slice(0, 4);
+    const maxYear = rows[rows.length - 1].Date.slice(0, 4);
+    const color = speakerColor(name);
+    const cls = scoreClass(average);
+    const width = Math.abs(average) / 2 * 50;
+    const left = average < 0 ? 50 - width : 50;
+
+    container.innerHTML += `
+      <article class="panel speaker-card">
+        <div class="speaker-name" style="color:${color}">${escapeHtml(name)}</div>
+        <div class="speaker-meta">${rows.length} speeches • ${minYear}-${maxYear}</div>
+        <div class="speaker-score ${cls}">${average > 0 ? '+' : ''}${average.toFixed(2)}</div>
+        <div class="speaker-tone">${scoreLabel(average)}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="left:${left}%;width:${width}%;background:${cls === 'hawk' ? 'var(--hawk)' : cls === 'dove' ? 'var(--dove)' : 'var(--neutral)'}"></div>
+          <div class="bar-center"></div>
+        </div>
+      </article>`;
+  });
+
+  if (!container.innerHTML) {
+    container.innerHTML = '<div class="panel empty">No rows in the current filter.</div>';
+  }
+}
+
+function renderTimeline() {
+  const monthly = new Map();
+  visibleRows.forEach(row => {
+    if (!monthly.has(row.MonthKey)) monthly.set(row.MonthKey, []);
+    monthly.get(row.MonthKey).push(row.hawk_dove_score);
+  });
+
+  const labels = [...monthly.keys()].sort();
+  const series = labels.map(label => {
+    const values = monthly.get(label);
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  });
+
+  if (timelineChart) timelineChart.destroy();
+  timelineChart = new Chart(document.getElementById('timeline-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: series,
+        borderColor: '#dbe9ff',
+        backgroundColor: series.map(value => value >= 0 ? 'rgba(255,107,107,0.14)' : 'rgba(103,183,255,0.14)'),
+        borderWidth: 2,
+        fill: true,
+        tension: 0.28,
+        pointRadius: 3,
+        pointHoverRadius: 4,
+        pointBackgroundColor: series.map(value => value >= 0 ? '#ff6b6b' : '#67b7ff'),
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: '#7f95b7', maxTicksLimit: 8, font: { family: 'IBM Plex Mono', size: 10 } },
+          grid: { color: 'rgba(127,149,183,0.08)' }
+        },
+        y: {
+          min: -2,
+          max: 2,
+          ticks: { stepSize: 1, color: '#7f95b7', font: { family: 'IBM Plex Mono', size: 10 } },
+          grid: { color: 'rgba(127,149,183,0.08)' }
+        }
+      }
+    }
+  });
+}
+
+function renderDistribution() {
+  const bins = [-2, -1, 0, 1, 2].map(score => visibleRows.filter(row => row.hawk_dove_score === score).length);
+  if (distributionChart) distributionChart.destroy();
+  distributionChart = new Chart(document.getElementById('distribution-chart'), {
+    type: 'bar',
+    data: {
+      labels: ['-2', '-1', '0', '+1', '+2'],
+      datasets: [{
+        data: bins,
+        backgroundColor: ['#67b7ff', '#8cc8ff', '#a4b5cb', '#ff9b9b', '#ff6b6b'],
+        borderRadius: 10,
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: '#7f95b7', font: { family: 'IBM Plex Mono', size: 11 } },
+          grid: { display: false }
+        },
+        y: {
+          ticks: { color: '#7f95b7', font: { family: 'IBM Plex Mono', size: 10 } },
+          grid: { color: 'rgba(127,149,183,0.08)' }
+        }
+      }
+    }
+  });
+}
+
+function renderRankings() {
+  const sorted = [...visibleRows].sort((a, b) => b.hawk_dove_score - a.hawk_dove_score || a.DateObj - b.DateObj);
+  const topHawk = sorted.slice(0, 5);
+  const topDove = [...sorted].reverse().slice(0, 5);
+
+  document.getElementById('hawk-list').innerHTML = buildRanking(topHawk, 'hawk');
+  document.getElementById('dove-list').innerHTML = buildRanking(topDove, 'dove');
+}
+
+function buildRanking(rows, mode) {
+  if (!rows.length) return '<li class="empty">No rows in the current filter.</li>';
+  return rows.map((row, index) => `
+    <li class="ranking-item">
+      <div class="rank-no">${index + 1}</div>
+      <div>
+        <div class="rank-title">${escapeHtml(row.Title || '(untitled speech)')}</div>
+        <div class="rank-meta">${escapeHtml(row.Authorname)} • ${escapeHtml(row.Date)}</div>
+      </div>
+      <div class="rank-score ${mode}">${row.hawk_dove_score > 0 ? '+' : ''}${row.hawk_dove_score}</div>
+    </li>`).join('');
+}
+
+function renderTable() {
+  const rows = [...visibleRows].sort((a, b) => compareRows(a, b, sortColumn, sortDirection));
+  document.getElementById('table-count').textContent = `${rows.length} rows`;
+  document.getElementById('speech-table').innerHTML = rows.length ? rows.map(row => {
+    const cls = scoreClass(row.hawk_dove_score);
+    return `
+      <tr>
+        <td>${escapeHtml(row.Date)}</td>
+        <td>${escapeHtml(row.Authorname)}</td>
+        <td><span class="score-pill ${cls}">${row.hawk_dove_score > 0 ? '+' : ''}${row.hawk_dove_score}</span></td>
+        <td>${row.confidence.toFixed(2)}</td>
+        <td><span class="status-tag">${escapeHtml(row.scoring_status || 'scored')}</span></td>
+        <td class="reason">${escapeHtml(row.short_rationale)}</td>
+      </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">No rows in the current filter.</td></tr>';
+}
+
+function compareRows(a, b, key, direction) {
+  let left = a[key];
+  let right = b[key];
+  if (key === 'Date') {
+    left = a.DateObj;
+    right = b.DateObj;
+  }
+  if (left < right) return direction === 'asc' ? -1 : 1;
+  if (left > right) return direction === 'asc' ? 1 : -1;
+  return 0;
+}
+
+loadBundledCsv();
+</script>
+</body>
+</html>

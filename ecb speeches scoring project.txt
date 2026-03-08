@@ -1,0 +1,131 @@
+Build a minimal Python project for an ECB hawkish/dovish speech dashboard.
+
+Data source:
+- Use the CBS Speeches dataset already downloaded locally.
+- Filter to ECB speeches only.
+- Keep only speeches from 2015 to 2023.
+- Start with a small subset of ECB speakers only.
+
+Goal:
+- Create a clean dataset with one row per ECB speech.
+- Score each speech on a hawkish/dovish scale using an LLM or a placeholder scoring function.
+- Build a simple Streamlit dashboard.
+
+Required columns in the cleaned/scored dataset:
+- date
+- speaker
+- title
+- text
+- url (if available)
+- hawk_dove_score
+- confidence
+- short_rationale
+
+Scoring scale:
+-2 = very dovish
+-1 = somewhat dovish
+0 = neutral/balanced
+1 = somewhat hawkish
+2 = very hawkish
+
+Important scoring rule:
+Measure the implied monetary policy stance, not the general tone of the speech.
+
+Scoring must support two modes:
+1. mock mode for pipeline testing
+2. API mode for real scoring
+
+Each score output must include:
+- hawk_dove_score
+- confidence
+- short_rationale
+
+The process must write partial results every N speeches so work is never lost.
+
+Deliverables:
+1. data loading and filtering script
+2. cleaning/preprocessing script
+3. scoring pipeline
+4. final scored dataset in parquet or csv
+5. simple Streamlit app with:
+   - average score over time
+   - speaker filter
+   - table of speeches and scores
+
+Keep the project as simple as possible.
+Do not implement pairwise comparisons.
+Do not add unnecessary complexity.
+
+---
+
+Build the project to be robust to API limits and interruptions.
+
+Implementation requirements:
+- The source CSV is local and large (~650 MB).
+- Filter to ECB speeches only, period 2015–2023.
+- Start with a subset of ECB speakers for testing.
+- Keep the pipeline modular:
+  1. load/filter data
+  2. prepare clean ECB subset
+  3. score speeches
+  4. run Streamlit dashboard
+- Add a mock scoring mode for testing without API calls.
+- Add a real API scoring mode that can be swapped easily.
+- Save progress incrementally during scoring.
+- If the process stops, it must resume from the last successfully scored speech.
+- Add retry logic with exponential backoff for API failures.
+- Add a configurable sleep between API calls.
+- Log failed requests to a file.
+- Allow running on a small sample first (e.g. 20, 50, 100 speeches).
+- Store outputs in both CSV and parquet if practical.
+
+Expected project files:
+- src/load_data.py
+- src/prepare_subset.py
+- src/score_speeches.py
+- src/scorers/
+- app.py
+- requirements.txt
+- .env.example
+- README.md
+
+Dashboard requirements:
+- line chart of average hawk_dove_score over time
+- speaker filter
+- table with date, speaker, title, score, confidence, rationale
+
+Keep the project minimal and practical.
+Do not add pairwise ranking.
+Do not add unnecessary methodological complexity.
+
+---
+
+Scoring prompt
+
+You are an analyst of ECB monetary policy communication.
+
+Task: evaluate the implicit monetary policy stance of an ECB speech on a dovish-to-hawkish scale.
+
+Important:
+- Measure only the implied monetary policy bias.
+- Do not measure general tone or rhetorical style.
+- A speech is hawkish if it signals concern about inflation and supports tighter or persistently restrictive policy.
+- A speech is dovish if it signals concern about weak growth/disinflation and supports easier policy or future easing.
+- If the speech is balanced or unclear, assign 0.
+
+Return valid JSON only with this schema:
+{
+  "hawk_dove_score": -2 | -1 | 0 | 1 | 2,
+  "confidence": 0.0 to 1.0,
+  "short_rationale": "one or two sentences"
+}
+
+---
+
+I already have:
+- the full CBS speeches CSV locally
+- the CBS codebook PDF
+- an exploratory notebook with early filtering/scoring attempts
+
+Please reuse the notebook only if helpful, but feel free to reorganize the project cleanly from scratch.
+Priority: robust, simple, resume-safe pipeline.
